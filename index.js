@@ -369,6 +369,36 @@ CresKitAccessory.prototype = {
                 break;
             }
 
+            case "Thermostat": {
+                var thermostatService = new Service.Thermostat();
+                thermostatService
+                    .getCharacteristic(Characteristic.CurrentTemperature)
+                    .on('get', this.getTemperature.bind(this));
+
+                thermostatService
+                    .getCharacteristic(Characteristic.TargetTemperature)
+                    .on('get', this.getThermostatTargetTemperature.bind(this))
+                    .on('set', this.setThermostatTargetTemperature.bind(this));
+
+                thermostatService
+                    .getCharacteristic(Characteristic.CurrentHeatingCoolingState)
+                    .on('get', this.getThermostatCurrentHeatingCoolingState.bind(this))
+                    .on('set', this.setThermostatCurrentHeatingCoolingState.bind(this));
+
+                thermostatService
+                    .getCharacteristic(Characteristic.TargetHeatingCoolingState)
+                    .on('get', this.getThermostatTargetHeatingCoolingState.bind(this))
+                    .on('set', this.setThermostatTargetHeatingCoolingState.bind(this));
+
+                thermostatService
+                    .getCharacteristic(Characteristic.TemperatureDisplayUnits)
+                    .on('get', this.getThermostatTemperatureDisplayUnits.bind(this));
+
+                services.push( thermostatService );
+                break;
+            }
+
+
         }
 
         return services;

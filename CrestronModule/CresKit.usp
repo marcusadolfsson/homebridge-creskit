@@ -23,14 +23,14 @@ STRING_PARAMETER IPAddr$[16];
 INTEGER_PARAMETER Port;
 
 DIGITAL_INPUT 	_SKIP_, _SKIP_;
-DIGITAL_INPUT Lights_Status[40]; // Feedback for Lights
+DIGITAL_INPUT Lights_Status[60]; // Feedback for Lights
 DIGITAL_INPUT Switch_Status[40]; // Feedback for Switch/Scenes
 
 DIGITAL_INPUT GarageDoor_Status[4]; // Feedback for Garage Doors. High = Closed, Low = Open (Use NOT symbol to inverse if needed)
 DIGITAL_INPUT Alarm_Stay[1], Alarm_Away[1], Alarm_Night[1], Alarm_Disarmed[1], Alarm_Triggered[1]; // Interlock before sending to modue. High = Active
 DIGITAL_OUTPUT 	_SKIP_, _SKIP_;
 
-DIGITAL_OUTPUT Lights_Set[40]; // Pulses Output - Modify code below if different behavior is needed
+DIGITAL_OUTPUT Lights_Set[60]; // Pulses Output - Modify code below if different behavior is needed
 DIGITAL_OUTPUT Switch_Set[40]; // Pulse
 DIGITAL_OUTPUT GarageDoor_Set[4]; // Pulse
 DIGITAL_OUTPUT Alarm_Stay_Set[1], Alarm_Away_Set[1], Alarm_Night_Set[1], Alarm_Disarmed_Set[1], _SKIP_; // Pulse

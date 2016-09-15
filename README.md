@@ -2,7 +2,7 @@
 
 CresKit (together with Homebridge) turns Creston controlled devices into HomeKit accessories, enabling you to control many functions using Siri and the iOS 10 Home app. 
 
-It is an early prototype, but functional. It requires you to install a Homebridge on an appropiate server before continuing. I use a $20 RaspberryPi, using this [tutorial](https://github.com/nfarina/homebridge/wiki/Running-HomeBridge-on-a-Raspberry-Pi).
+It is an early prototype, but functional. It requires you to install a Homebridge on an appropriate server before continuing. I use a $20 RaspberryPi, using this [tutorial](https://github.com/nfarina/homebridge/wiki/Running-HomeBridge-on-a-Raspberry-Pi).
  
 As of CresKit 1.1.1 the following HomeKit accessories are supported:
 

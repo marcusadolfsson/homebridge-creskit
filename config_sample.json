@@ -1,0 +1,63 @@
+// Note remove comments or json file does not load.
+
+{
+    "bridge": {
+        "name": "Creskit",
+        "username": "CC:22:3D:E3:CE:32",
+        "port": 51826,
+        "pin": "031-45-154"
+    },
+
+    "platforms": [
+    {
+      "platform": "CresKit",
+      "name": "CresKit",
+      "host": "192.168.5.22", // IP Address of Crestron System
+      "port": "50001", // Match Port specified in Modue
+
+      // ID matches with the Crestron Signal Symbol
+      // accessories types
+      // Lightbulb, Switch, GarageDoorOpener, SecuritySystem
+
+      "accessories":[
+        {
+          "id":1,
+          "type":"Lightbulb",
+          "name":"Marcus Sidelight"
+        },
+        {
+          "id":2,
+          "type":"Lightbulb",
+          "name":"Casey Sidelight"
+        },
+        {
+          "id":3,
+          "type":"Lightbulb",
+          "name":"Bathroom"
+        },
+        {
+          "id":1,
+          "type":"Switch",
+          "name":"Good Night Scene"  // Switches can be used to trigger Crestron Scenes. If you have a Crestron "Good Night" scene, add the switch the Home app's "Good Night" scene
+        },
+        {
+          "id":1,
+          "type":"GarageDoorOpener",
+          "name":"Main Garage"
+
+        },
+        {
+          "id":2,
+          "type":"GarageDoorOpener",
+          "name":"Side Garage"
+
+        },
+        {
+          "id":1,
+          "type":"SecuritySystem",
+          "name":"Alarm"
+        }
+      ]
+    }
+  ]
+}

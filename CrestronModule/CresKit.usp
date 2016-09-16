@@ -1,7 +1,7 @@
 /*******************************************************************************************
 CresKit Module
 
-This is a functional protoype of the CresKit module. Very basic! Save and Compile to use in
+This is a functional protype of the CresKit module. Very basic! Save and Compile to use in
 your project.
 
 The module creates a TCP Server on the Creston system (only tested on MC3),
@@ -36,7 +36,8 @@ DIGITAL_OUTPUT GarageDoor_Set[4]; // Pulse
 DIGITAL_OUTPUT Alarm_Stay_Set[1], Alarm_Away_Set[1], Alarm_Night_Set[1], Alarm_Disarmed_Set[1], _SKIP_; // Pulse
 
 SIGNED_INTEGER doServerConnected;
-TCP_SERVER MyServer[1024];
+String InternalRxBuffer[65000];
+TCP_SERVER MyServer[9999];
 
 #BEGIN_PARAMETER_PROPERTIES IPAddr$  // To restrict IP access, enter client IP in module.
    propDefaultValue = "0.0.0.0";
@@ -67,7 +68,7 @@ function SocketTx(STRING ServerTx) {
     if (iStatus < 0) {
 		Print("Error Sending to MyServer: %d\n", iStatus);
     } else {
-		Print("Sent %s", ServerTx);
+		Print("Sent %s\n", ServerTx);
 	}
 }
 
@@ -98,7 +99,7 @@ function CmdParser(STRING ServerRx) {
    	ValueInt = Atoi(Value);
 
 	// Command Router
-	Print("CmdParser: %s %d %s %d", Service, IDInt, Cmd, ValueInt);
+	Print("CmdParser: %s %d %s %d\n", Service, IDInt, Cmd, ValueInt);
 
 	// set Cmd
 	if (Service="Lightbulb" && Cmd="setPowerState") {
@@ -114,9 +115,9 @@ function CmdParser(STRING ServerRx) {
 
 	if (Service="GarageDoorOpener" && Cmd="setTargetDoorState") {
 		if (ValueInt=0 && GarageDoor_Status[IDInt]=1) { // 0=open, 1=closed. Only open if garage door is closed.
-    		Pulse(1,GarageDoor_Set[IDInt]);
+    		Pulse(2,GarageDoor_Set[IDInt]);
 		} else if (ValueInt=1 && GarageDoor_Status[IDInt]=0) {
-    		Pulse(1,GarageDoor_Set[IDInt]);
+    		Pulse(2,GarageDoor_Set[IDInt]);
 		}
 	}
     if (Service="SecuritySystem" && Cmd="setSecuritySystemTargetState") {
@@ -158,10 +159,12 @@ function CmdParser(STRING ServerRx) {
 	}
 }
 
-function SocketRx(STRING ServerRx) {
-	STRING Temp$[10000];
-     WHILE (LEN(ServerRx) > 1) {
-		Temp$ = REMOVE("*",ServerRx);
+function SocketRx() {
+    String Temp$[65000];
+	Print("InternalRxBuffer: %s\n", InternalRxBuffer);
+
+    WHILE (LEN(InternalRxBuffer) > 1) {
+		Temp$ = REMOVE("*",InternalRxBuffer);
     	Temp$ = LEFT(Temp$, (Len(Temp$)-1));
 		CmdParser(Temp$);
 	}
@@ -235,8 +238,9 @@ SOCKETSTATUS MyServer {
 }
 
 SOCKETRECEIVE MyServer {
-	SocketRx(MyServer.SocketRxBuf);
-    ClearBuffer(MyServer.SocketRxBuf);
+	InternalRxBuffer = InternalRxBuffer + MyServer.SocketRxBuf;
+	ClearBuffer(MyServer.SocketRxBuf);
+	SocketRx();
 }
 
 
@@ -247,3 +251,4 @@ Function Main() {
     StartServer();
 
 }
+

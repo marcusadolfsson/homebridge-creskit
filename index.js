@@ -38,6 +38,28 @@ function fromEventCheck(what) {
     }
 }
 
+var openGetStatus = []; // Sometimes a getStatus does not come back. We need to re-try for the app to be responsive.
+function closeGetStatus(what) {
+    var found = openGetStatus.indexOf(what);
+    openGetStatus.splice(found, 1);
+}
+
+// Resend unclosed GetStatus
+function retryGetStatus() {
+    async.each(openGetStatus, function (writeString, callback) {
+        try {
+            cresKitSocket.write(writeString);
+            console.log("RETRY: " + writeString);
+        } catch (err) {
+            this.log(err);
+        }
+        callback();
+    }.bind(this), function (err) {
+        //console.log("retryGetStatus complete");
+    });
+}
+setInterval(function() { retryGetStatus(); }, 2000);
+
 function CresKit(log, config) {
     this.log = log;
     this.config = config;
@@ -59,9 +81,15 @@ CresKit.prototype = {
             this.log('Connection closed');
             // Handle error properly
             // Reconnect
-            cresKitSocket.connect(this.config["port"], this.config["host"], function() {
-                this.log('Re-Connected to Crestron Machine');
-            }.bind(this));
+            try {
+                cresKitSocket.connect(this.config["port"], this.config["host"], function() {
+                    this.log('Re-Connected to Crestron Machine');
+                }.bind(this));
+            } catch (err) {
+                this.log(err);
+            }
+
+
         }.bind(this));
 
         // All Crestron replies goes via this connection
@@ -127,10 +155,13 @@ CresKitAccessory.prototype = {
     //---------------
     getPowerState: function(callback) { // this.config.type = Lightbulb, Switch
         cresKitSocket.write(this.config.type + ":" + this.id + ":getPowerState:*"); // (:* required) on get
+        openGetStatus.push(this.config.type + ":" + this.id + ":getPowerState:*");
+        this.log("cresKitSocket.write - " + this.config.type + ":" + this.id + ":getPowerState:*");
 
         // Listen Once for value coming back, if it does trigger callback
-       eventEmitter.once(this.config.type + ":" + this.id + ":getPowerState", function(value) {
+        eventEmitter.once(this.config.type + ":" + this.id + ":getPowerState", function(value) {
             try {
+                closeGetStatus(this.config.type + ":" + this.id + ":getPowerState:*");
                 callback( null, value);
             } catch (err) {
                 this.log(err);
@@ -138,10 +169,8 @@ CresKitAccessory.prototype = {
         }.bind(this));
     },
     setPowerState: function(state, callback) {
-
         //Do NOT send cmd to Crestron when Homebridge was notified from an Event - Crestron already knows the state!
         if (fromEventCheck(this.config.type + ":" + this.id + ":eventPowerState:" + state)==false) {
-
             if (state) {
                 cresKitSocket.write(this.config.type + ":" + this.id + ":setPowerState:1*"); // (* after value required on set)
                 //this.log("cresKitSocket.write - " + this.config.type + ":" + this.id + ":setPowerState:1*");
@@ -149,7 +178,6 @@ CresKitAccessory.prototype = {
                 cresKitSocket.write(this.config.type + ":" + this.id + ":setPowerState:0*");
                 //this.log("cresKitSocket.write - " + this.config.type + ":" + this.id + ":setPowerState:0*");
             }
-
         }
 
         callback();
@@ -159,10 +187,12 @@ CresKitAccessory.prototype = {
     //---------------
     getCurrentDoorState: function(callback) {
         cresKitSocket.write("GarageDoorOpener:" + this.id + ":getCurrentDoorState:*"); // (:* required)
+        openGetStatus.push(this.config.type + ":" + this.id + ":getCurrentDoorState:*");
 
         // Listen Once for value coming back. 0 open, 1 closed
         eventEmitter.once("GarageDoorOpener:" + this.id + ":getCurrentDoorState", function(value) {
             try {
+                closeGetStatus(this.config.type + ":" + this.id + ":getCurrentDoorState:*");
                 callback( null, value);
             } catch (err) {
                 this.log(err);
@@ -186,9 +216,12 @@ CresKitAccessory.prototype = {
     //---------------
     getSecuritySystemCurrentState: function(callback) {
         cresKitSocket.write("SecuritySystem:" + this.id + ":getSecuritySystemCurrentState:*"); // (:* required)
+        openGetStatus.push(this.config.type + ":" + this.id + ":getSecuritySystemCurrentState:*");
+
         //armedStay=0 , armedAway=1, armedNight=2, disarmed=3, alarmValues = 4
         eventEmitter.once("SecuritySystem:" + this.id + ":getSecuritySystemCurrentState", function(value) {
             try {
+                closeGetStatus(this.config.type + ":" + this.id + ":getSecuritySystemCurrentState:*");
                 callback( null, value);
             } catch (err) {
                 this.log(err);

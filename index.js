@@ -42,6 +42,8 @@ var openGetStatus = []; // Sometimes a getStatus does not come back. We need to 
 function closeGetStatus(what) {
     var found = openGetStatus.indexOf(what);
     openGetStatus.splice(found, 1);
+
+    console.log(openGetStatus);
 }
 
 // Resend unclosed GetStatus
@@ -51,7 +53,7 @@ function retryGetStatus() {
             cresKitSocket.write(writeString);
             console.log("RETRY: " + writeString);
         } catch (err) {
-            this.log(err);
+            console.log(err);
         }
         callback();
     }.bind(this), function (err) {
@@ -94,7 +96,7 @@ CresKit.prototype = {
 
         // All Crestron replies goes via this connection
         cresKitSocket.on('data', function(data) {
-            //this.log("Raw Crestron Data : " + data);
+            this.log("Raw Crestron Data : " + data);
 
             // Data from Creston Module. This listener parses the information and updates Homebridge
             // get* - replies from get* requests
@@ -143,6 +145,7 @@ function CresKitAccessory(log, platformConfig, accessoryConfig) {
     this.id = accessoryConfig.id;
     this.name = accessoryConfig.name
     this.model = "CresKit";
+
 }
 
 CresKitAccessory.prototype = {
@@ -151,12 +154,12 @@ CresKitAccessory.prototype = {
         callback();
     },
     //---------------
-    // Lightbulb, Switch (Scenes)
+    // PowerState - Lightbulb, Switch, SingleSpeedFan (Scenes)
     //---------------
-    getPowerState: function(callback) { // this.config.type = Lightbulb, Switch
+    getPowerState: function(callback) { // this.config.type = Lightbulb, Switch, etc
         cresKitSocket.write(this.config.type + ":" + this.id + ":getPowerState:*"); // (:* required) on get
         openGetStatus.push(this.config.type + ":" + this.id + ":getPowerState:*");
-        this.log("cresKitSocket.write - " + this.config.type + ":" + this.id + ":getPowerState:*");
+        //this.log("cresKitSocket.write - " + this.config.type + ":" + this.id + ":getPowerState:*");
 
         // Listen Once for value coming back, if it does trigger callback
         eventEmitter.once(this.config.type + ":" + this.id + ":getPowerState", function(value) {
@@ -168,10 +171,10 @@ CresKitAccessory.prototype = {
             }
         }.bind(this));
     },
-    setPowerState: function(state, callback) {
+    setPowerState: function(value, callback) {
         //Do NOT send cmd to Crestron when Homebridge was notified from an Event - Crestron already knows the state!
-        if (fromEventCheck(this.config.type + ":" + this.id + ":eventPowerState:" + state)==false) {
-            if (state) {
+        if (fromEventCheck(this.config.type + ":" + this.id + ":eventPowerState:" + value)==false) {
+            if (value) {
                 cresKitSocket.write(this.config.type + ":" + this.id + ":setPowerState:1*"); // (* after value required on set)
                 //this.log("cresKitSocket.write - " + this.config.type + ":" + this.id + ":setPowerState:1*");
             } else {
@@ -186,23 +189,27 @@ CresKitAccessory.prototype = {
     // Garage
     //---------------
     getCurrentDoorState: function(callback) {
-        cresKitSocket.write("GarageDoorOpener:" + this.id + ":getCurrentDoorState:*"); // (:* required)
+        cresKitSocket.write(this.config.type + ":" + this.id + ":getCurrentDoorState:*"); // (:* required)
         openGetStatus.push(this.config.type + ":" + this.id + ":getCurrentDoorState:*");
 
         // Listen Once for value coming back. 0 open, 1 closed
-        eventEmitter.once("GarageDoorOpener:" + this.id + ":getCurrentDoorState", function(value) {
+        eventEmitter.once(this.config.type + ":" + this.id + ":getCurrentDoorState", function(value) {
             try {
                 closeGetStatus(this.config.type + ":" + this.id + ":getCurrentDoorState:*");
+
+                // Update TargetDoorState via event event
+                eventEmitter.emit(this.config.type + ":" + this.id + ":eventCurrentDoorState", value);
+
                 callback( null, value);
             } catch (err) {
                 this.log(err);
             }
         }.bind(this));
     },
-    setTargetDoorState: function(state, callback) {
-        //this.log("setTargetDoorState %s", state);
-        if (fromEventCheck(this.config.type + ":" + this.id + ":eventGarageDoorState:" + state)==false) {
-            cresKitSocket.write("GarageDoorOpener:" + this.id + ":setTargetDoorState:" + state + "*");
+    setTargetDoorState: function(value, callback) {
+        //this.log("setTargetDoorState %s", value);
+        if (fromEventCheck(this.config.type + ":" + this.id + ":eventCurrentDoorState:" + value)==false) {
+            cresKitSocket.write(this.config.type + ":" + this.id + ":setTargetDoorState:" + value + "*");
         }
         callback();
     },
@@ -210,33 +217,168 @@ CresKitAccessory.prototype = {
         // Not yet support
         callback( null, 0 );
     },
-
     //---------------
     // Security System
     //---------------
     getSecuritySystemCurrentState: function(callback) {
-        cresKitSocket.write("SecuritySystem:" + this.id + ":getSecuritySystemCurrentState:*"); // (:* required)
+        cresKitSocket.write(this.config.type + ":" + this.id + ":getSecuritySystemCurrentState:*"); // (:* required)
         openGetStatus.push(this.config.type + ":" + this.id + ":getSecuritySystemCurrentState:*");
 
         //armedStay=0 , armedAway=1, armedNight=2, disarmed=3, alarmValues = 4
-        eventEmitter.once("SecuritySystem:" + this.id + ":getSecuritySystemCurrentState", function(value) {
+        eventEmitter.once(this.config.type + ":" + this.id + ":getSecuritySystemCurrentState", function(value) {
             try {
                 closeGetStatus(this.config.type + ":" + this.id + ":getSecuritySystemCurrentState:*");
+
+                // Update securitySystemTargetState via event event
+                eventEmitter.emit(this.config.type + ":" + this.id + ":eventSecuritySystemCurrentState", value);
+
                 callback( null, value);
             } catch (err) {
                 this.log(err);
             }
         }.bind(this));
     },
-    setSecuritySystemTargetState: function(state, callback) {
-        if (fromEventCheck(this.config.type + ":" + this.id + ":eventSecuritySystemCurrentState:" + state)==false) {
-            cresKitSocket.write("SecuritySystem:" + this.id + ":setSecuritySystemTargetState:" + state + "*");
+    setSecuritySystemTargetState: function(value, callback) {
+        if (fromEventCheck(this.config.type + ":" + this.id + ":eventSecuritySystemCurrentState:" + value)==false) {
+            cresKitSocket.write(this.config.type + ":" + this.id + ":setSecuritySystemTargetState:" + value + "*");
         }
         callback();
     },
-
     //---------------
-    // Setup Config
+    // Binary Sensor
+    //---------------
+    getBinarySensorState: function(callback) {
+        cresKitSocket.write(this.config.type + ":" + this.id + ":getBinarySensorState:*"); // (:* required)
+        openGetStatus.push(this.config.type + ":" + this.id + ":getBinarySensorState:*");
+
+        // Listen Once for value coming back. 0 open, 1 closed
+        eventEmitter.once(this.config.type + ":" + this.id + ":getBinarySensorState", function(value) {
+            try {
+                closeGetStatus(this.config.type + ":" + this.id + ":getBinarySensorState:*");
+                callback( null, value);
+            } catch (err) {
+                this.log(err);
+            }
+        }.bind(this));
+    },
+    //---------------
+    // Lock (or any event that you needs push notifications)
+    //---------------
+    getLockCurrentState: function(callback) {
+        //UNSECURED = 0;, SECURED = 1; .JAMMED = 2; UNKNOWN = 3;
+
+        cresKitSocket.write(this.config.type + ":" + this.id + ":getLockCurrentState:*"); // (:* required)
+        openGetStatus.push(this.config.type + ":" + this.id + ":getLockCurrentState:*");
+
+        // Listen Once for value coming back. 0 open, 1 closed
+        eventEmitter.once(this.config.type + ":" + this.id + ":getLockCurrentState", function(value) {
+            try {
+                closeGetStatus(this.config.type + ":" + this.id + ":getLockCurrentState:*");
+
+                // Update setLockTargetState via event event
+                eventEmitter.emit(this.config.type + ":" + this.id + ":eventLockCurrentState", value);
+
+                callback( null, value);
+            } catch (err) {
+                this.log(err);
+            }
+        }.bind(this));
+    },
+    setLockTargetState: function(value, callback) {
+        //UNSECURED = 0;, SECURED = 1;
+        if (fromEventCheck(this.config.type + ":" + this.id + ":eventLockCurrentState:" + value)==false) {
+            cresKitSocket.write(this.config.type + ":" + this.id + ":setLockTargetState:" + value + "*");
+        }
+        callback();
+
+    },
+    //---------------
+    // MultiSpeedFan
+    //---------------
+    getRotationSpeed: function(callback) {
+        cresKitSocket.write(this.config.type + ":" + this.id + ":getRotationSpeed:*"); // (:* required) on get
+        openGetStatus.push(this.config.type + ":" + this.id + ":getRotationSpeed:*");
+
+        // Listen Once for value coming back, if it does trigger callback
+        eventEmitter.once(this.config.type + ":" + this.id + ":getRotationSpeed", function(value) {
+            try {
+                closeGetStatus(this.config.type + ":" + this.id + ":getRotationSpeed:*");
+
+                // Update PowerState via event event
+                eventEmitter.emit(this.config.type + ":" + this.id + ":eventRotationSpeed", value);
+
+                callback( null, value);
+            } catch (err) {
+                this.log(err);
+            }
+        }.bind(this));
+    },
+    setRotationSpeed: function(value, callback) {
+
+        //Do NOT send cmd to Crestron when Homebridge was recently notified from an Event - Crestron already knows the state!
+        if (fromEventCheck(this.config.type + ":" + this.id + ":eventRotationSpeed:" + value)==false) {
+            cresKitSocket.write(this.config.type + ":" + this.id + ":setRotationSpeed:" + value + "*"); // (* after value required on set)
+            this.log("cresKitSocket.write("+this.config.type + ":" + this.id + ":setRotationSpeed:" + value + "*");
+        }
+
+        callback();
+    },
+    setRotationState: function(value, callback) {
+
+        if (fromEventCheck(this.config.type + ":" + this.id + ":eventRotationState:" + value)==false) {
+            if (value == 0) {
+                cresKitSocket.write(this.config.type + ":" + this.id + ":setRotationSpeed:0*");
+                this.log("cresKitSocket.write("+this.config.type + ":" + this.id + ":setRotationSpeed:0*");
+            }
+            if (value == 1) {
+                cresKitSocket.write(this.config.type + ":" + this.id + ":setRotationSpeed:999*"); //999 = 100 if off, otherwise leave current
+                this.log("cresKitSocket.write("+this.config.type + ":" + this.id + ":setRotationSpeed:999*");
+            }
+        }
+
+        callback();
+    },
+    //---------------
+    // getValue/setValue Window Covering
+    //---------------
+    getCurrentPosition: function(callback) {
+        callback( null, 100);
+
+        //cresKitSocket.write(this.config.type + ":" + this.id + ":getCurrentPosition:*"); // (:* required)
+        //openGetStatus.push(this.config.type + ":" + this.id + ":getCurrentPosition:*");
+
+        eventEmitter.once(this.config.type + ":" + this.id + ":getCurrentPosition", function(value) {
+            try {
+                closeGetStatus(this.config.type + ":" + this.id + ":getCurrentPosition:*");
+
+                eventEmitter.emit(this.config.type + ":" + this.id + ":eventCurrentPosition", value);
+
+                //callback( null, value);
+            } catch (err) {
+                this.log(err);
+            }
+        }.bind(this));
+    },
+    setTargetPosition: function(value, callback) {
+
+        if (fromEventCheck(this.config.type + ":" + this.id + ":setTargetPosition:" + value)==false) {
+
+            if (value==0) { //closed
+                cresKitSocket.write(this.config.type + ":" + this.id + ":setTargetPosition:0*");
+            } else { //any thing else open for now
+                cresKitSocket.write(this.config.type + ":" + this.id + ":setTargetPosition:1*");
+            }
+
+
+        }
+        callback();
+
+    },
+    getPositionState: function(callback) {
+        callback( null, 2 );  // Temporarily return STOPPED
+    },
+    //---------------
+    // Characteristic Config
     //---------------
     getServices: function() {
         var services = []
@@ -251,15 +393,15 @@ CresKitAccessory.prototype = {
         switch( this.config.type ) {
             case "Lightbulb": {
                 var lightbulbService = new Service.Lightbulb();
-                var On = lightbulbService
+                var PowerState = lightbulbService
                     .getCharacteristic(Characteristic.On)
                     .on('set', this.setPowerState.bind(this))
                     .on('get', this.getPowerState.bind(this));
 
                 // Register a listener
-                eventEmitter.on("Lightbulb:" + this.id + ":eventPowerState", function(value) {
-                    eventCheckData.push("Lightbulb:" + this.id + ":eventPowerState:" + value);
-                    On.setValue(value);
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventPowerState", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventPowerState:" + value);
+                    PowerState.setValue(value);
                 }.bind(this));
 
                 services.push( lightbulbService );
@@ -268,18 +410,105 @@ CresKitAccessory.prototype = {
 
             case "Switch": {
                 var switchService = new Service.Switch();
-                var On = switchService
+                var PowerState = switchService
                     .getCharacteristic(Characteristic.On)
                     .on('set', this.setPowerState.bind(this))
                     .on('get', this.getPowerState.bind(this));
 
                 // Register a listener for event changes
-                eventEmitter.on("Switch:" + this.id + ":eventPowerState", function(value) {
-                    eventCheckData.push("Switch:" + this.id + ":eventPowerState:" + value);
-                    On.setValue(value);
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventPowerState", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventPowerState:" + value);
+                    PowerState.setValue(value);
                 }.bind(this));
 
                 services.push( switchService );
+                break;
+            }
+
+            case "ContactSensor": {
+                var contactSensorService = new Service.ContactSensor();
+                var BinarySensorState = contactSensorService
+                    .getCharacteristic(Characteristic.ContactSensorState)
+                    .on('get', this.getBinarySensorState.bind(this));
+
+                // Register a listener for event changes
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventBinarySensorState", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventBinarySensorState:" + value);
+                    BinarySensorState.setValue(value);
+                }.bind(this));
+
+                services.push( contactSensorService );
+                break;
+            }
+
+            case "Lock": {
+                var lockService = new Service.LockMechanism();
+                var LockCurrentState = lockService
+                    .getCharacteristic(Characteristic.LockCurrentState)
+                    .on('get', this.getLockCurrentState.bind(this));
+                var LockTargetState = lockService
+                    .getCharacteristic(Characteristic.LockTargetState)
+                    .on('set', this.setLockTargetState.bind(this));
+
+                // Register a listener for event changes
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventLockCurrentState", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventLockCurrentState:" + value);
+                    LockCurrentState.setValue(value);
+                    LockTargetState.setValue(value)
+                }.bind(this));
+
+                services.push( lockService );
+                break;
+            }
+
+            case "SingleSpeedFan": {
+                var fanService = new Service.Fan();
+                var PowerState = fanService
+                    .getCharacteristic(Characteristic.On)
+                    .on('set', this.setPowerState.bind(this))
+                    .on('get', this.getPowerState.bind(this));
+
+                // Register a listener for event changes
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventPowerState", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventPowerState:" + value);
+                    PowerState.setValue(value);
+                }.bind(this));
+
+                services.push( fanService );
+                break;
+            }
+
+            case "MultiSpeedFan": {
+                var fanService = new Service.Fan();
+
+                var RotationState = fanService
+                    .getCharacteristic(Characteristic.On)
+                    .on('set', this.setRotationState.bind(this)); // requied for turning off when not using slider interface
+
+                var RotationSpeed = fanService
+                    .getCharacteristic(Characteristic.RotationSpeed)
+                    .on("set", this.setRotationSpeed.bind(this))
+                    .on("get", this.getRotationSpeed.bind(this));
+
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventRotationSpeed", function(value) {
+
+                    var power_value;
+                    if (value == 0) {
+                        power_value = 0;
+                    } else {
+                        power_value = 1;
+                    }
+
+                    //this.log("FAN DEBUG " + this.config.type + ":" + this.id + ":eventRotationSpeed " + value + " " + power_value);
+
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventRotationSpeed:" + value);
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventRotationState:" + power_value);
+                    RotationSpeed.setValue(value);
+                    RotationState.setValue(power_value);
+
+                }.bind(this));
+
+                services.push( fanService );
                 break;
             }
 
@@ -296,22 +525,10 @@ CresKitAccessory.prototype = {
                     .on('get', this.getObstructionDetected.bind(this));
 
                 // Register a listener for event changes
-                eventEmitter.on("GarageDoorOpener:" + this.id + ":eventGarageDoorState", function(value) {
-                    eventCheckData.push("GarageDoorOpener:" + this.id + ":eventGarageDoorState:" + value);
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventCurrentDoorState", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventCurrentDoorState:" + value);
                     CurrentDoorState.setValue(value); // also set target so the system knows we initiated it open/closed
                     TargetDoorState.setValue(value);
-                }.bind(this));
-
-                // One-Time Initilization for Startup Values
-                cresKitSocket.write("GarageDoorOpener:" + this.id + ":getCurrentDoorState:*"); // (:* required)
-                eventEmitter.once("GarageDoorOpener:" + this.id + ":getCurrentDoorState", function(value) {
-                    try {
-                        eventCheckData.push("GarageDoorOpener:" + this.id + ":eventGarageDoorState:" + value); // Treat response as an event (so it doesn't send)
-                        CurrentDoorState.setValue(value);
-                        TargetDoorState.setValue(value);
-                    } catch (err) {
-                        this.log(err);
-                    }
                 }.bind(this));
 
                 services.push( garageDoorOpenerService );
@@ -328,26 +545,39 @@ CresKitAccessory.prototype = {
                     .on('set', this.setSecuritySystemTargetState.bind(this));
 
                 // Register a listener for event changes
-                eventEmitter.on("SecuritySystem:" + this.id + ":eventSecuritySystemCurrentState", function(value) {
-                    eventCheckData.push("SecuritySystem:" + this.id + ":eventSecuritySystemCurrentState:" + value);
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventSecuritySystemCurrentState", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventSecuritySystemCurrentState:" + value);
                     SecuritySystemCurrentState.setValue(value);
                     SecuritySystemTargetState.setValue(value);
                 }.bind(this));
 
-                // Special Initilization to set Startup Values
-                cresKitSocket.write("SecuritySystem:" + this.id + ":getSecuritySystemCurrentState:*"); // (:* required)
-                eventEmitter.once("SecuritySystem:" + this.id + ":getSecuritySystemCurrentState", function(value) {
-                    try {
-                        eventCheckData.push("SecuritySystem:" + this.id + ":eventSecuritySystemCurrentState:" + value); // Treat response as an event (so it doesn't send)
-                        SecuritySystemCurrentState.setValue(value);
-                        SecuritySystemTargetState.setValue(value);
-                    } catch (err) {
-                        this.log(err);
-                    }
+                services.push( securitySystemService );
+                break;
+            }
+
+            case "WindowCovering": {
+                var windowCoveringService = new Service.WindowCovering();
+                var CurrentPosition = windowCoveringService
+                    .getCharacteristic(Characteristic.CurrentPosition)
+                    .on('get', this.getCurrentPosition.bind(this));
+                var TargetPosition = windowCoveringService
+                    .getCharacteristic(Characteristic.TargetPosition)
+                    .on('set', this.setTargetPosition.bind(this));
+                var PositionState = windowCoveringService
+                    .getCharacteristic(Characteristic.PositionState)
+                    .on('get', this.getPositionState.bind(this));
+
+
+                // Register a listener for event changes
+                eventEmitter.on(this.config.type + ":" + this.id + ":eventCurrentPosition", function(value) {
+                    eventCheckData.push(this.config.type + ":" + this.id + ":eventCurrentPosition:" + value);
+                    CurrentPosition.setValue(value);
+                    TargetPosition.setValue(value);
                 }.bind(this));
 
 
-                services.push( securitySystemService );
+                services.push( windowCoveringService );
+
                 break;
             }
 
